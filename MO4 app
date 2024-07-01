@@ -1,0 +1,59 @@
+from flask import Flask, request, jsonify, abort
+from models import db, Book
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///books.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+
+@app.before_first_request
+def create_tables():
+    db.create_all()
+
+# Create a new book
+@app.route('/books', methods=['POST'])
+def create_book():
+    data = request.get_json()
+    if not data or not 'book_name' in data or not 'author' in data or not 'publisher' in data:
+        abort(400)
+    new_book = Book(book_name=data['book_name'], author=data['author'], publisher=data['publisher'])
+    db.session.add(new_book)
+    db.session.commit()
+    return jsonify({'id': new_book.id, 'book_name': new_book.book_name, 'author': new_book.author, 'publisher': new_book.publisher}), 201
+
+# Read all books
+@app.route('/books', methods=['GET'])
+def get_books():
+    books = Book.query.all()
+    return jsonify([{'id': book.id, 'book_name': book.book_name, 'author': book.author, 'publisher': book.publisher} for book in books])
+
+# Read a single book by ID
+@app.route('/books/<int:book_id>', methods=['GET'])
+def get_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    return jsonify({'id': book.id, 'book_name': book.book_name, 'author': book.author, 'publisher': book.publisher})
+
+# Update a book
+@app.route('/books/<int:book_id>', methods=['PUT'])
+def update_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    data = request.get_json()
+    if not data:
+        abort(400)
+    book.book_name = data.get('book_name', book.book_name)
+    book.author = data.get('author', book.author)
+    book.publisher = data.get('publisher', book.publisher)
+    db.session.commit()
+    return jsonify({'id': book.id, 'book_name': book.book_name, 'author': book.author, 'publisher': book.publisher})
+
+# Delete a book
+@app.route('/books/<int:book_id>', methods=['DELETE'])
+def delete_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    db.session.delete(book)
+    db.session.commit()
+    return jsonify({'message': 'Book deleted successfully'})
+
+if __name__ == '__main__':
+    app.run(debug=True)
